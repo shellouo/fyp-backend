@@ -5,18 +5,16 @@ from pydantic import BaseModel
 from pathlib import Path
 from typing import List, Tuple
 
-# ✅ 修正导入路径：从 app.model_prediction 引入你的推理函数
 from app.model_prediction import predict_and_display
 
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
-# data_test 目录位于 fyp_backend/data_test
 DATA_TEST_DIR = (Path(__file__).resolve().parent / ".." / "data_test").resolve()
 DATA_TEST_DIR.mkdir(parents=True, exist_ok=True)
 
 router = APIRouter()
 
-# ---------------- 工具函数 ----------------
+# ---------------- Utility Functions ----------------
 def _is_allowed(filename: str) -> bool:
     return Path(filename).suffix.lower() in ALLOWED_EXTS
 
@@ -32,21 +30,22 @@ def _delete_all_images():
 
 def _enforce_single_after_change():
     """
-    当目录内图片数量 >= 2 ——> 立即清空所有图片并抛错，要求用户重新上传。
+    If the number of images in the directory is >= 2 → immediately delete all images and raise an error,
+    requiring the user to re-upload.
     """
     imgs = _list_images()
     if len(imgs) >= 2:
         _delete_all_images()
         raise HTTPException(
             status_code=400,
-            detail="data_test 中存在两张或以上图片，已全部删除。请重新上传（系统只允许同时存在一张图片）。"
+            detail="Two or more images were found in the data_test directory and have been deleted. Please re-upload (the system only allows one image at a time)."
         )
 
 def _call_predict(image_path: Path) -> Tuple[int, str, float, str, float]:
     """
-    兼容两种返回：
+    Compatible with two types of return values:
       - (age, gender, gender_conf, race, race_conf)
-      - (age, gender_conf, race_conf)  -> gender/race 置为 'Unknown'
+      - (age, gender_conf, race_conf)  -> set gender/race as 'Unknown'
     """
     try:
         res = predict_and_display(str(image_path))
@@ -66,23 +65,23 @@ def _call_predict(image_path: Path) -> Tuple[int, str, float, str, float]:
 
     return int(age), str(gender), float(gender_conf), str(race), float(race_conf)
 
-# ---------------- 请求体（可选） ----------------
+# ---------------- Request Body  ----------------
 class FilenameRequest(BaseModel):
     filename: str
 
-# ---------------- 路由 ----------------
+# ---------------- Routes ----------------
 @router.post("/predict")
 async def predict(file: UploadFile = File(...)):
     """
-    1) 保存上传文件到 ../data_test
-    2) 若该目录出现 >=2 张图：清空并报错，提醒用户重传（系统只允许同时存在 1 张）
-    3) 调用 predict_and_display(image_path)
-    4) 返回 JSON
+    1) Save the uploaded file to ../data_test
+    2) If the directory contains >= 2 images: clear it and raise an error, asking the user to re-upload (only 1 image is allowed at a time)
+    3) Call predict_and_display(image_path)
+    4) Return JSON
     """
     if not _is_allowed(file.filename):
         raise HTTPException(status_code=400, detail="Unsupported file type.")
 
-    # 保存上传文件
+    # Save uploaded file
     try:
         content = await file.read()
         save_path = (DATA_TEST_DIR / Path(file.filename).name).resolve()
@@ -91,10 +90,10 @@ async def predict(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Save failed: {e}")
 
-    # 检查数量限制
+    # Check file count limit
     _enforce_single_after_change()
 
-    # 调用模型
+    # Call the model
     age, gender, gender_conf, race, race_conf = _call_predict(save_path)
 
     return JSONResponse(content={

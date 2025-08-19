@@ -5,8 +5,8 @@ from app.routes import router
 
 app = FastAPI(title="FYP Age Prediction API", version="1.0.0")
 
-# 允许前端 vue 的本地网址python -m uvicorn main:app --reload
-# (5173) 访问
+# Allow frontend Vue local URL access (e.g. http://localhost:5173) when running: python -m uvicorn main:app --reload
+# (Port 5173)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -15,7 +15,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 只注册一次路由
+# Register the route only once
+
 app.include_router(router)
 
 
